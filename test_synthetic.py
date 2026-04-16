@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from elevation_mapping import HeightMapBuilder, gaussian_smooth
+from terrain_toolkit import HeightMapBuilder, gaussian_smooth
 
 BOUNDS = (-5.0, 5.0, -5.0, 5.0)
 RESOLUTION = 0.1

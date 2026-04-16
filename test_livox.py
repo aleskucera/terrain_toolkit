@@ -2,8 +2,8 @@ import argparse
 
 import numpy as np
 import plotly.graph_objects as go
-from elevation_mapping import gaussian_smooth
-from elevation_mapping import HeightMapBuilder
+from terrain_toolkit import gaussian_smooth
+from terrain_toolkit import HeightMapBuilder
 from plotly.subplots import make_subplots
 
 

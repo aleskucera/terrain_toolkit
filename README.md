@@ -1,4 +1,4 @@
-# Elevation Mapping
+# Terrain Toolkit
 
 GPU-accelerated point cloud to heightmap conversion using [NVIDIA Warp](https://github.com/NVIDIA/warp).
 
@@ -31,7 +31,7 @@ uv sync --group dev
 
 ```python
 import numpy as np
-from elevation_mapping import HeightMapBuilder, multigrid_inpaint, gaussian_smooth
+from terrain_toolkit import HeightMapBuilder, multigrid_inpaint, gaussian_smooth
 
 # Build heightmap from point cloud
 builder = HeightMapBuilder(
