@@ -13,3 +13,6 @@ __pycache__/
 .idea/
 .vscode/
 *.swp
+
+# Claude Code
+.claude/
