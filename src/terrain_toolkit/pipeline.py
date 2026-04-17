@@ -76,6 +76,7 @@ class TerrainPipeline:
         smooth_sigma: float = 0.0,
         inpaint_iters_per_level: int = 50,
         inpaint_coarse_iters: int = 200,
+        z_max: float | None = None,
         traversability: TraversabilityConfig | None = None,
         filter: FilterConfig | None = None,
     ):
@@ -91,6 +92,7 @@ class TerrainPipeline:
         self.resolution = resolution
         self.bounds = bounds
         self.primary = primary
+        self.z_max = z_max
         self.inpaint = inpaint
         self.smooth_sigma = smooth_sigma
         self.inpaint_iters_per_level = inpaint_iters_per_level
@@ -119,6 +121,8 @@ class TerrainPipeline:
             )
 
     def process(self, points: np.ndarray) -> TerrainMap:
+        if self.z_max is not None:
+            points = points[points[:, 2] <= self.z_max]
         layers = self.builder.build(points)
         primary_layer = getattr(layers, self.primary)
 

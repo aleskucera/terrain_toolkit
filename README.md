@@ -74,9 +74,9 @@ pipe = TerrainPipeline(
         roughness_weight=0.6,
     ),
     filter=FilterConfig(                 # optional; set to None to skip
-        support_radius_m=0.1,
-        support_ratio=0.75,
-        inflation_radius_m=0.4,
+        support_radius_m=0.5,
+        support_ratio=0.5,
+        inflation_sigma_m=0.3,
         obstacle_threshold=0.8,
     ),
 )

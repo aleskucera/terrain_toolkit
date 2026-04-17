@@ -23,6 +23,7 @@ def parse_args() -> argparse.Namespace:
         default="max",
         help="Which reduction feeds inpaint → smooth → cost.",
     )
+    p.add_argument("--z-max", type=float, default=None, help="Discard points above this height (m)")
     p.add_argument(
         "--filter",
         action="store_true",
@@ -56,6 +57,7 @@ def main() -> None:
         smooth_sigma=args.smooth_sigma,
         inpaint_coarse_iters=args.coarse_iters,
         inpaint_iters_per_level=args.iters_per_level,
+        z_max=args.z_max,
         traversability=TraversabilityConfig(),
         filter=FilterConfig() if args.filter else None,
     )
@@ -184,6 +186,29 @@ def main() -> None:
     print(
         f"traversable cost=[{np.nanmin(tm.traversability):.3f}, {np.nanmax(tm.traversability):.3f}]"
     )
+
+    # Save traversability as a plain image for debugging (not affected by Plotly rendering)
+    import matplotlib.pyplot as plt
+
+    fig_img, ax = plt.subplots(figsize=(10, 8))
+    cmap = plt.cm.RdYlGn_r.copy()
+    cmap.set_bad(color="black")
+    im = ax.imshow(
+        tm.traversability,
+        origin="lower",
+        extent=[xmin, xmax, ymin, ymax],
+        cmap=cmap,
+        vmin=0.0,
+        vmax=1.0,
+    )
+    fig_img.colorbar(im, ax=ax, label="cost")
+    ax.set_title("Traversability cost" + (" (filtered)" if args.filter else ""))
+    ax.set_xlabel("x (m)")
+    ax.set_ylabel("y (m)")
+    img_out = "traversability_ouster.png"
+    fig_img.savefig(img_out, dpi=150, bbox_inches="tight")
+    plt.close(fig_img)
+    print(f"Wrote {img_out}")
 
 
 if __name__ == "__main__":
