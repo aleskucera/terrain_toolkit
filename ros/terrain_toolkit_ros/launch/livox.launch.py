@@ -42,7 +42,7 @@ def generate_launch_description() -> LaunchDescription:
             "inpaint", default_value="true", description="Enable multigrid inpainting"
         ),
         DeclareLaunchArgument(
-            "inpaint_coarse_iters", default_value="50", description="Inpaint coarse iterations"
+            "inpaint_coarse_iters", default_value="200", description="Inpaint coarse iterations"
         ),
         DeclareLaunchArgument(
             "inpaint_iters_per_level",

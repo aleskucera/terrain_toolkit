@@ -96,14 +96,7 @@ class TerrainToolkitNode(Node):
         self._build_pipeline(p)
         self.add_on_set_parameters_callback(self._on_parameters_changed)
 
-        self.get_logger().info(
-            f"TerrainToolkitNode ready — "
-            f"lidar={self.lidar_topic}, frame={self.robot_frame}, "
-            f"res={p['resolution']}m, x_range=±{p['x_range']}m, y_range=±{p['y_range']}m, "
-            f"outlier={'off' if not p['outlier_enable'] else p['outlier_type']}, "
-            f"trav={'on' if p['trav_enable'] else 'off'}, "
-            f"filter={'on' if p['filter_enable'] else 'off'}"
-        )
+        self._log_config(p)
 
     # ------------------------------------------------------------------
     # Parameter declaration
@@ -191,6 +184,31 @@ class TerrainToolkitNode(Node):
             "filter_rejection_limit_frames", "filter_min_obstacle_baseline",
         ]
         return {k: self.get_parameter(k).value for k in keys}
+
+    def _log_config(self, p: dict) -> None:
+        groups: list[tuple[str, list[str]]] = [
+            ("ROS / sensor",   ["lidar_topic", "map_frame", "robot_frame", "square_half_size"]),
+            ("Grid",           ["resolution", "x_range", "y_range"]),
+            ("Pipeline",       ["z_max", "primary", "inpaint", "inpaint_coarse_iters",
+                                "inpaint_iters_per_level", "smooth_sigma"]),
+            ("Outlier",        ["outlier_enable", "outlier_type", "outlier_search_radius_m",
+                                "outlier_min_neighbors", "outlier_std_multiplier"]),
+            ("Traversability", ["trav_enable", "trav_max_slope_deg", "trav_max_step_height_m",
+                                "trav_max_drop_height_m", "trav_max_roughness_m",
+                                "trav_step_window_radius_m", "trav_roughness_window_radius_m",
+                                "trav_slope_weight", "trav_step_weight", "trav_roughness_weight"]),
+            ("Temporal filter",["filter_enable", "filter_support_radius_m", "filter_support_ratio",
+                                "filter_inflation_sigma_m", "filter_obstacle_threshold",
+                                "filter_obstacle_growth_threshold", "filter_rejection_limit_frames",
+                                "filter_min_obstacle_baseline"]),
+        ]
+        lines = ["TerrainToolkitNode configuration:"]
+        for title, keys in groups:
+            lines.append(f"  [{title}]")
+            width = max(len(k) for k in keys)
+            for k in keys:
+                lines.append(f"    {k:<{width}} = {p[k]!r}")
+        self.get_logger().info("\n".join(lines))
 
     # ------------------------------------------------------------------
     # Pipeline construction
