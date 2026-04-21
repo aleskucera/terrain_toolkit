@@ -125,12 +125,12 @@ def generate_launch_description() -> LaunchDescription:
         ),
         DeclareLaunchArgument(
             "filter_support_radius_m",
-            default_value="0.8",
+            default_value="0.5",
             description="Neighborhood radius for support check (m)",
         ),
         DeclareLaunchArgument(
             "filter_support_ratio",
-            default_value="0.2",
+            default_value="0.1",
             description="Min fraction of measured cells to keep",
         ),
         DeclareLaunchArgument(
