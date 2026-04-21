@@ -360,14 +360,17 @@ class TerrainToolkitNode(Node):
         x_coords = (x_min + (col_grid + 0.5) * resolution).astype(np.float32)
         y_coords = (y_min + (row_grid + 0.5) * resolution).astype(np.float32)
 
-        valid = np.isfinite(terrain_map.elevation)
-        x_valid = x_coords[valid]
-        y_valid = y_coords[valid]
-        z_valid = terrain_map.elevation[valid].astype(np.float32)
-
         # as_dict() already skips layers that were not downloaded (None).
         layer_dict = terrain_map.as_dict()
         layer_names = sorted(layer_dict.keys())
+
+        valid = np.isfinite(terrain_map.elevation)
+        for arr in layer_dict.values():
+            valid &= np.isfinite(arr)
+
+        x_valid = x_coords[valid]
+        y_valid = y_coords[valid]
+        z_valid = terrain_map.elevation[valid].astype(np.float32)
         layers_valid = [layer_dict[k][valid].astype(np.float32) for k in layer_names]
 
         n_pts = x_valid.shape[0]
