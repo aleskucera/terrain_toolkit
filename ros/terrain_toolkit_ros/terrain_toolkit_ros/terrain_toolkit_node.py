@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ROS 2 Jazzy interface node for the terrain_toolkit library.
+ROS 2 Kilted interface node for the terrain_toolkit library.
 
 Subscribes to a LiDAR PointCloud2, transforms it into the robot frame, runs the
 terrain_toolkit pipeline, and republishes the resulting grid as a PointCloud2

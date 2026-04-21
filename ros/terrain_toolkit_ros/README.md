@@ -1,6 +1,6 @@
 # terrain_toolkit_ros
 
-ROS 2 **Jazzy** wrapper for the [`terrain_toolkit`](https://github.com/aleskucera/terrain_toolkit)
+ROS 2 **Kilted** wrapper for the [`terrain_toolkit`](https://github.com/aleskucera/terrain_toolkit)
 library. Subscribes to a LiDAR `PointCloud2`, transforms it into the robot
 frame, runs the GPU terrain pipeline, and republishes the resulting grid as
 a `PointCloud2` whose points carry one `FLOAT32` field per `TerrainMap`
