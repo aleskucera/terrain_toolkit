@@ -15,6 +15,14 @@ _dev_shell_repo="$(cd "$_dev_shell_dir/.." && pwd)"
 if [[ -f "$_dev_shell_repo/.venv/bin/activate" ]]; then
     # shellcheck disable=SC1091
     source "$_dev_shell_repo/.venv/bin/activate"
+    # ament_python node scripts get a /usr/bin/python3 shebang (colcon forces
+    # system python), so export the venv's site-packages on PYTHONPATH to make
+    # terrain_toolkit + warp importable from the system interpreter too.
+    _dev_shell_site="$(ls -d "$_dev_shell_repo"/.venv/lib/python*/site-packages 2>/dev/null | head -1)"
+    if [[ -n "$_dev_shell_site" ]]; then
+        export PYTHONPATH="$_dev_shell_site${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+    unset _dev_shell_site
 else
     echo "[dev-shell] no .venv at $_dev_shell_repo/.venv" >&2
     echo "[dev-shell] create one with: cd $_dev_shell_repo && uv venv --system-site-packages && uv pip install -e ." >&2
