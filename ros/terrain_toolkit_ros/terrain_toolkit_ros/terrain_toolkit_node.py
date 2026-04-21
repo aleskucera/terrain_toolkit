@@ -382,9 +382,11 @@ class TerrainToolkitNode(Node):
         layer_dict = terrain_map.as_dict()
         layer_names = sorted(layer_dict.keys())
 
+        # Only drop cells with no elevation at all — inpainted cells with NaN
+        # cost layers (cells without enough real-neighbor support) still need
+        # to reach RViz so the user can see the filled heightmap. The cloud is
+        # marked is_dense=False below to advertise that NaNs may appear.
         valid = np.isfinite(terrain_map.elevation)
-        for arr in layer_dict.values():
-            valid &= np.isfinite(arr)
 
         x_valid = x_coords[valid]
         y_valid = y_coords[valid]
@@ -415,7 +417,7 @@ class TerrainToolkitNode(Node):
         cloud_msg.is_bigendian = False
         cloud_msg.point_step = offset
         cloud_msg.row_step = offset * n_pts
-        cloud_msg.is_dense = True
+        cloud_msg.is_dense = False
         cloud_msg.data = point_data.astype(np.float32).tobytes()
         return cloud_msg
 
