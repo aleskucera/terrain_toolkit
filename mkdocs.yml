@@ -12,6 +12,8 @@ theme:
     - navigation.sections
     - navigation.indexes
     - navigation.top
+    - navigation.footer
+    - navigation.instant
     - toc.follow
     - content.code.copy
     - content.action.edit
