@@ -41,3 +41,8 @@ windows:
   - shell:
       panes:
         - <%= exec_sh %> bash -c 'source "<%= ws_repo %>/ros/dev-shell.sh"; exec bash'
+  # rqt_reconfigure GUI for live parameter tuning of the running node.
+  # Sliders for every float / int range, checkboxes for bools.
+  - rqt:
+      panes:
+        - <%= exec_sh %> bash -c 'source /opt/ros/jazzy/setup.bash && ros2 run rqt_reconfigure rqt_reconfigure; exec bash'
