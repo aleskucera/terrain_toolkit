@@ -13,11 +13,16 @@ _dev_shell_dir="$(cd "$(dirname "$_dev_shell_path")" && pwd)"
 _dev_shell_repo="$(cd "$_dev_shell_dir/.." && pwd)"
 
 if [[ -f "$_dev_shell_repo/.venv/bin/activate" ]]; then
-    # shellcheck disable=SC1091
-    source "$_dev_shell_repo/.venv/bin/activate"
-    # ament_python node scripts get a /usr/bin/python3 shebang (colcon forces
-    # system python), so expose what the venv holds on PYTHONPATH. Two entries
-    # are needed:
+    # Activate the venv ONLY on the host. Inside the Apptainer container, the
+    # venv's python is a symlink to the host's interpreter and doesn't see the
+    # container's system site-packages (yaml, etc.) that ROS needs — activating
+    # it would break rclpy. PYTHONPATH injection (below) is enough either way,
+    # since ament_python node scripts use the /usr/bin/python3 shebang anyway.
+    if [[ -z "$SINGULARITY_CONTAINER" ]]; then
+        # shellcheck disable=SC1091
+        source "$_dev_shell_repo/.venv/bin/activate"
+    fi
+    # Expose what the venv holds via PYTHONPATH. Two entries are needed:
     #   - the venv's site-packages: makes regular installs (warp, numpy, …) visible
     #   - <repo>/src: exposes terrain_toolkit itself. The venv installs it as an
     #     editable (.pth) entry, but .pth files are only processed inside "site"
@@ -33,12 +38,23 @@ else
     echo "[dev-shell] create one with: cd $_dev_shell_repo && uv venv --system-site-packages && uv pip install -e ." >&2
 fi
 
-if [[ -f /opt/ros/kilted/setup.bash ]]; then
+# Pick the first available ROS 2 distro. Prefer kilted (the host target) but
+# fall back to jazzy so this script also works inside the Apptainer container,
+# which is jazzy-based.
+_dev_shell_ros=""
+for _distro in kilted jazzy; do
+    if [[ -f "/opt/ros/$_distro/setup.bash" ]]; then
+        _dev_shell_ros="/opt/ros/$_distro/setup.bash"
+        break
+    fi
+done
+if [[ -n "$_dev_shell_ros" ]]; then
     # shellcheck disable=SC1091
-    source /opt/ros/kilted/setup.bash
+    source "$_dev_shell_ros"
 else
-    echo "[dev-shell] /opt/ros/kilted/setup.bash not found — skipping ROS source" >&2
+    echo "[dev-shell] no /opt/ros/{kilted,jazzy}/setup.bash found — skipping ROS source" >&2
 fi
+unset _dev_shell_ros _distro
 
 # If the repo is <ws>/src/terrain_toolkit, source <ws>/install/setup.bash when present.
 _dev_shell_ws="$(cd "$_dev_shell_repo/../.." 2>/dev/null && pwd)"
