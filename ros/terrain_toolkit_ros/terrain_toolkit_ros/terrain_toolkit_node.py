@@ -382,11 +382,15 @@ class TerrainToolkitNode(Node):
         layer_dict = terrain_map.as_dict()
         layer_names = sorted(layer_dict.keys())
 
-        # Only drop cells with no elevation at all — inpainted cells with NaN
-        # cost layers (cells without enough real-neighbor support) still need
-        # to reach RViz so the user can see the filled heightmap. The cloud is
-        # marked is_dense=False below to advertise that NaNs may appear.
+        # Drop cells the SupportRatioMask flagged as too far from any real
+        # measurement: those have NaN traversability (and NaN slope/step/roughness)
+        # even though inpaint filled their elevation. Publishing them would make
+        # the heightmap look complete in regions where we actually have no data.
+        # When the filter chain is disabled (no traversability layer at all),
+        # fall back to elevation finiteness — there's no support signal to use.
         valid = np.isfinite(terrain_map.elevation)
+        if terrain_map.traversability is not None:
+            valid &= np.isfinite(terrain_map.traversability)
 
         x_valid = x_coords[valid]
         y_valid = y_coords[valid]

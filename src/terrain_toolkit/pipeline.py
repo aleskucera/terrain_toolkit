@@ -188,6 +188,11 @@ class TerrainPipeline:
         layers = self.builder.build(pts_wp)
         primary_layer = layers[self.primary]  # wp.array
 
+        # multigrid_inpaint mutates its input buffer. The support mask needs the
+        # ORIGINAL NaN-bearing primary to know which cells were really measured,
+        # so snapshot it before inpaint runs.
+        raw_primary = wp.clone(primary_layer) if self.inpaint else primary_layer
+
         elevation = primary_layer
         if self.inpaint:
             elevation = multigrid_inpaint(
@@ -209,7 +214,7 @@ class TerrainPipeline:
                 # become NaN, and frames that spike in obstacle count are rejected.
                 inflated = self.inflator.apply(total)
                 if self.temporal_gate.is_stable(inflated):
-                    total = self.support_mask.apply(primary_layer, inflated)
+                    total = self.support_mask.apply(raw_primary, inflated)
                 else:
                     total = self.support_mask.rejected_frame()
             traversability_wp = total
