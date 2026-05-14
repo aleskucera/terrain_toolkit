@@ -102,6 +102,7 @@ class TerrainPipeline:
         traversability: TraversabilityConfig | None = None,
         filter: FilterConfig | None = None,
         layers: tuple[str, ...] | None = None,
+        device: str | wp.context.Device | None = None,
     ):
         if primary not in ("max", "mean", "min"):
             raise ValueError(f"primary must be 'max', 'mean', or 'min'; got {primary!r}")
@@ -111,6 +112,21 @@ class TerrainPipeline:
             )
         if filter is not None and traversability is None:
             raise ValueError("filter is only meaningful when traversability is enabled")
+
+        # Resolve the Warp device once. Accepts "cpu", "cuda:0", a wp.Device, or
+        # None (use Warp's current default). Outlier filtering uses wp.HashGrid
+        # which is CUDA-only, so reject that combination up front.
+        if device is None:
+            self.device = wp.get_device()
+        elif isinstance(device, str):
+            self.device = wp.get_device(device)
+        else:
+            self.device = device
+        if outlier is not None and not self.device.is_cuda:
+            raise ValueError(
+                "outlier filtering requires a CUDA device (wp.HashGrid is GPU-only); "
+                f"got device={self.device}"
+            )
 
         # Resolve which layers to download. `None` = everything the configured
         # stages produce. Skipping unused layers saves a D2H copy each — about
@@ -137,15 +153,17 @@ class TerrainPipeline:
         self.inpaint_iters_per_level = inpaint_iters_per_level
         self.inpaint_coarse_iters = inpaint_coarse_iters
 
-        self.builder = HeightMapBuilder(resolution=resolution, bounds=bounds)
+        self.builder = HeightMapBuilder(
+            resolution=resolution, bounds=bounds, device=self.device,
+        )
         self.height = self.builder.height
         self.width = self.builder.width
 
         self.outlier_filter: StatisticalOutlierFilter | RadiusOutlierFilter | None = None
         if isinstance(outlier, RadiusOutlierFilterConfig):
-            self.outlier_filter = RadiusOutlierFilter(config=outlier)
+            self.outlier_filter = RadiusOutlierFilter(config=outlier, device=self.device)
         elif isinstance(outlier, OutlierFilterConfig):
-            self.outlier_filter = StatisticalOutlierFilter(config=outlier)
+            self.outlier_filter = StatisticalOutlierFilter(config=outlier, device=self.device)
 
         self.analyzer: GeometricTraversabilityAnalyzer | None = None
         if traversability is not None:
@@ -154,6 +172,7 @@ class TerrainPipeline:
                 height=self.height,
                 width=self.width,
                 config=traversability,
+                device=self.device,
             )
 
         self.inflator: ObstacleInflator | None = None
@@ -165,20 +184,30 @@ class TerrainPipeline:
                 height=self.height,
                 width=self.width,
                 config=filter,
+                device=self.device,
             )
-            self.temporal_gate = TemporalGate(config=filter)
+            self.temporal_gate = TemporalGate(config=filter, device=self.device)
             self.support_mask = SupportRatioMask(
                 resolution=resolution,
                 height=self.height,
                 width=self.width,
                 config=filter,
+                device=self.device,
             )
 
     def process(self, points: np.ndarray) -> TerrainMap:
         if self.z_max is not None:
             points = points[points[:, 2] <= self.z_max]
 
-        # Single upload to GPU — every stage below consumes wp.array.
+        # Scope every allocation and kernel launch in this frame to the chosen
+        # device — without this, helpers that call wp.array(...) or wp.zeros(...)
+        # without an explicit device= argument would land on Warp's global
+        # default, which can differ from self.device.
+        with wp.ScopedDevice(self.device):
+            return self._process(points)
+
+    def _process(self, points: np.ndarray) -> TerrainMap:
+        # Single upload to the active device — every stage below consumes wp.array.
         pts_wp = wp.array(
             np.ascontiguousarray(points, dtype=np.float32), dtype=wp.vec3,
         )

@@ -24,19 +24,26 @@ def _as_wp_float32(heightmap: np.ndarray | wp.array) -> tuple[wp.array, bool]:
 
 
 def _run_diffusion(a: wp.array, b: wp.array, fixed: wp.array, iters: int) -> wp.array:
-    """Run `iters` diffusion steps using CUDA graph capture, return buffer with result."""
+    """Run `iters` diffusion steps. Uses a captured CUDA graph on GPU; on CPU
+    (or any non-CUDA device) falls back to plain `wp.launch` calls."""
     if iters <= 0:
         return a
-    wp.capture_begin()
-    try:
-        wp.launch(diffuse_step_kernel, dim=(a.shape[0], a.shape[1]), inputs=[a, fixed, b])
-        wp.launch(diffuse_step_kernel, dim=(a.shape[0], a.shape[1]), inputs=[b, fixed, a])
-    finally:
-        graph = wp.capture_end()
-    for _ in range(iters // 2):
-        wp.capture_launch(graph)
+    dim = (a.shape[0], a.shape[1])
+    if a.device.is_cuda:
+        wp.capture_begin()
+        try:
+            wp.launch(diffuse_step_kernel, dim=dim, inputs=[a, fixed, b])
+            wp.launch(diffuse_step_kernel, dim=dim, inputs=[b, fixed, a])
+        finally:
+            graph = wp.capture_end()
+        for _ in range(iters // 2):
+            wp.capture_launch(graph)
+    else:
+        for _ in range(iters // 2):
+            wp.launch(diffuse_step_kernel, dim=dim, inputs=[a, fixed, b])
+            wp.launch(diffuse_step_kernel, dim=dim, inputs=[b, fixed, a])
     if iters % 2:
-        wp.launch(diffuse_step_kernel, dim=(a.shape[0], a.shape[1]), inputs=[a, fixed, b])
+        wp.launch(diffuse_step_kernel, dim=dim, inputs=[a, fixed, b])
         a, b = b, a
     return a
 
@@ -100,26 +107,30 @@ def multigrid_inpaint(
 def diffuse_inpaint(
     heightmap: np.ndarray | wp.array, max_iters: int = 500,
 ) -> np.ndarray | wp.array:
-    """Fill NaN cells by iterative diffusion from known cells (Laplace inpainting on GPU).
+    """Fill NaN cells by iterative diffusion from known cells (Laplace inpainting).
 
-    Uses CUDA graph capture to replay the iteration loop without per-launch Python overhead.
+    Uses CUDA graph capture on GPU to replay the iteration loop without per-launch
+    Python overhead; on CPU falls back to plain `wp.launch` calls.
     """
     a, from_numpy = _as_wp_float32(heightmap)
     fixed = _fixed_mask_from(a)
     b = wp.zeros(a.shape, dtype=wp.float32)
 
-    # Capture a CUDA graph for 2 iterations (one ping-pong round).
-    wp.capture_begin()
-    try:
-        wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[a, fixed, b])
-        wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[b, fixed, a])
-    finally:
-        graph = wp.capture_end()
-
     full_rounds = max_iters // 2
     remainder = max_iters % 2
-    for _ in range(full_rounds):
-        wp.capture_launch(graph)
+    if a.device.is_cuda:
+        wp.capture_begin()
+        try:
+            wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[a, fixed, b])
+            wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[b, fixed, a])
+        finally:
+            graph = wp.capture_end()
+        for _ in range(full_rounds):
+            wp.capture_launch(graph)
+    else:
+        for _ in range(full_rounds):
+            wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[a, fixed, b])
+            wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[b, fixed, a])
     if remainder:
         wp.launch(diffuse_step_kernel, dim=a.shape, inputs=[a, fixed, b])
         a, b = b, a

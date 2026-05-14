@@ -53,6 +53,7 @@ def _quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
 
 # Parameters that require rebuilding the TerrainPipeline when changed.
 _PIPELINE_PARAMS = frozenset({
+    "device",
     "resolution", "x_range", "y_range",
     "z_max", "primary", "inpaint", "inpaint_coarse_iters", "inpaint_iters_per_level", "smooth_sigma",
     "outlier_enable", "outlier_type",
@@ -124,6 +125,11 @@ class TerrainToolkitNode(Node):
         self.declare_parameter("map_frame", "map", sp("Map TF frame (unused)"))
         self.declare_parameter("robot_frame", "base_link", sp("Robot TF frame"))
         self.declare_parameter("square_half_size", 10.0, fp("Half-side of square ROI (m)", 0.5, 200.0))
+        self.declare_parameter(
+            "device", "auto",
+            sp("Warp compute device: 'auto', 'cpu', or 'cuda:N'. "
+               "'auto' = CUDA if available else CPU. Outlier filtering requires CUDA."),
+        )
 
         # Grid
         self.declare_parameter("resolution", 0.15, fp("Grid cell size (m)", 0.01, 5.0))
@@ -169,7 +175,7 @@ class TerrainToolkitNode(Node):
 
     def _read_parameters(self) -> dict:
         keys = [
-            "lidar_topic", "map_frame", "robot_frame", "square_half_size",
+            "lidar_topic", "map_frame", "robot_frame", "square_half_size", "device",
             "resolution", "x_range", "y_range",
             "z_max", "primary", "inpaint", "inpaint_coarse_iters", "inpaint_iters_per_level", "smooth_sigma",
             "outlier_enable", "outlier_type",
@@ -187,7 +193,7 @@ class TerrainToolkitNode(Node):
 
     def _log_config(self, p: dict) -> None:
         groups: list[tuple[str, list[str]]] = [
-            ("ROS / sensor",   ["lidar_topic", "map_frame", "robot_frame", "square_half_size"]),
+            ("ROS / sensor",   ["lidar_topic", "map_frame", "robot_frame", "square_half_size", "device"]),
             ("Grid",           ["resolution", "x_range", "y_range"]),
             ("Pipeline",       ["z_max", "primary", "inpaint", "inpaint_coarse_iters",
                                 "inpaint_iters_per_level", "smooth_sigma"]),
@@ -258,6 +264,15 @@ class TerrainToolkitNode(Node):
                 min_obstacle_baseline=p["filter_min_obstacle_baseline"],
             )
 
+        # 'auto' picks CUDA if available, else CPU. Explicit "cpu" / "cuda:N"
+        # passes straight to Warp.
+        device_param = p["device"]
+        if device_param == "auto":
+            import warp as wp
+            device_arg = "cuda:0" if wp.is_cuda_available() else "cpu"
+        else:
+            device_arg = device_param
+
         self.pipe = TerrainPipeline(
             resolution=p["resolution"],
             bounds=(-p["x_range"], p["x_range"], -p["y_range"], p["y_range"]),
@@ -270,6 +285,7 @@ class TerrainToolkitNode(Node):
             outlier=outlier_cfg,
             traversability=traversability_cfg,
             filter=filter_cfg,
+            device=device_arg,
         )
 
     # ------------------------------------------------------------------
